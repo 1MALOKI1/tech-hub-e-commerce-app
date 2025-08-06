@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext,useState, useEffect } from "react";
+import api from '../utils/axios'
 
-const AuthContext = createContext();
+export const AuthContext = createContext()
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -10,57 +11,54 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function AuthProvider({children}){
+    const [loading, setLoading] = useState(true);
+    const [user, setUser] = useState(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (token && userData) {
-      setUser(JSON.parse(userData));
+    useEffect(()=>{
+        const token = localStorage.getItem('token')
+        const userData = localStorage.getItem('user')
+        if(userData && token){
+            setUser(JSON.parse(userData))
+        }
+        setLoading(false)
+    },[])
+
+    const login = async (email, password)=>{
+        try{
+            setLoading(true)
+            const response = await api.post('/auth/login', {email, password})
+            const {user, access_token} = response.data.data
+            localStorage.setItem('token', access_token)
+            localStorage.setItem('user', JSON.stringify(user))
+            setUser(user)
+            return {success : true }
+        }
+        catch(e){
+            return {success: false, error : e.response?.data?.message || e.message }
+        }
+        finally{
+            setLoading(false)
+        }
     }
-    setLoading(false);
-  }, []);
 
-  const login = async (email) => {
-    try {
-      const mockUser = {
-        id: 1,
-        email: email,
-        name: 'Demo User',
-        role: 'customer'
-      };
-      const mockToken = 'demo-token-123';
-      
-      setUser(mockUser);
-      localStorage.setItem('token', mockToken);
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
+    const logout = ()=>{
+        setUser(null)
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
     }
-  };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-  };
+    const value = {
+        login,
+        user,
+        loading,
+        logout,
+        isAuthenticated: !!user
+    }
 
-  const value = {
-    user,
-    login,
-    logout,
-    loading,
-    isAuthenticated: !!user
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+    return(
+        <AuthContext.Provider value={value} >
+            {children}
+        </AuthContext.Provider>
+    )
+}
